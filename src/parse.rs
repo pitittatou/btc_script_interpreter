@@ -1,7 +1,7 @@
 use crate::opcodes::{OPCODES, INVALID_OPCODES, OP_PUSH_DATA_1, OP_PUSH_DATA_2, OP_PUSH_DATA_4};
 use crate::script::{Script, ScriptError};
 use crate::script::ScriptError::ParsingError;
-use crate::script::ScriptItem::{ByteArray, Opcode, OpPushBytes};
+use crate::script::ScriptItem::{ByteArray, Opcode};
 
 pub fn parse(bytes: &[u8], debug: bool) -> Result<Script, ScriptError> {
     if debug {
@@ -39,8 +39,7 @@ pub fn parse(bytes: &[u8], debug: bool) -> Result<Script, ScriptError> {
             };
 
             let data = bytes.get(cursor..cursor + byte_nb).ok_or(ParsingError)?;
-            items.push(OpPushBytes);
-            items.push(ByteArray(data));
+            items.push(ByteArray(Vec::from(data)));
             cursor += byte_nb - 1;
         }
         // OP_PUSH_BYTES_X opcode
@@ -48,8 +47,7 @@ pub fn parse(bytes: &[u8], debug: bool) -> Result<Script, ScriptError> {
             let byte_nb = opcode.code as usize;
             cursor += 1;
             let data = bytes.get(cursor..cursor + byte_nb).ok_or(ParsingError)?;
-            items.push(OpPushBytes);
-            items.push(ByteArray(data));
+            items.push(ByteArray(Vec::from(data)));
             cursor += byte_nb - 1;
         }
         else {
