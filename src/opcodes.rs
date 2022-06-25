@@ -382,24 +382,12 @@ lazy_static! {
         }
         map
     };
-    pub static ref INVALID_OPCODES: HashSet<Opcode> = {
+    pub static ref DISABLED_OPCODES: HashSet<Opcode> = {
         let opcodes = [OP_CAT, OP_SUBSTR, OP_LEFT, OP_RIGHT, OP_INVERT, OP_AND, OP_OR, OP_XOR,
-            OP_2MUL, OP_2DIV, OP_MUL, OP_MOD, OP_DIV, OP_LSHIFT, OP_RSHIFT, OP_VERIF, OP_VERNOTIF];
-        let mut set = HashSet::with_capacity(17);
+            OP_2MUL, OP_2DIV, OP_MUL, OP_MOD, OP_DIV, OP_LSHIFT, OP_RSHIFT];
+        let mut set = HashSet::with_capacity(15);
         for op in opcodes {
             set.insert(op);
-        }
-        set
-    };
-    pub static ref INVALID_IF_EXECUTED_OPCODES: HashSet<Opcode> = {
-        let mut set = HashSet::with_capacity(100);
-        set.insert(OP_RETURN);
-        set.insert(OP_RESERVED);
-        set.insert(OP_RESERVED1);
-        set.insert(OP_RESERVED2);
-        set.insert(OP_VER);
-        for c in 0xba..=0xff {
-            set.insert(Opcode::from(c));
         }
         set
     };

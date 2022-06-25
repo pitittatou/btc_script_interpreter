@@ -2,18 +2,28 @@ use std::fmt::{Debug, Formatter};
 use crate::opcodes::Opcode as op;
 
 pub const MAX_NUM_SIZE: usize = 4;
+pub const SCRIPT_FALSE: [u8; 0] = [];
+pub const SCRIPT_TRUE: [u8; 1] = [0x01];
 
 #[derive(Debug)]
 pub enum ScriptError {
-    ParsingError,
-    ScriptNumberOverflow
+    ParsingErr,
+    InvalidStackOperationErr,
+    InvalidAltStackOperationErr,
+    ScriptNumberOverflowErr,
+    StackOverflowErr,
+    PushSizeErr,
+    EqualVerifyErr,
+    NumEqualVerifyErr,
+    UnbalancedConditionalErr,
+    DisabledOpcodeErr,
+    InvalidOpcodeErr,
+    BadOpcodeErr,
+    VerifyErr,
+    OpReturnErr
 }
 
-#[derive(Debug)]
-pub struct Script {
-    pub valid: bool,
-    pub items: Vec<ScriptItem>
-}
+pub type Script = Vec<ScriptItem>;
 
 // Not sure if I should use references that would probably be more optimized but create code bloat
 pub enum ScriptItem {
@@ -57,7 +67,7 @@ pub fn to_script_nb(value: i64) -> Vec<u8> {
 // Only numbers of at most 4 bytes are accepted
 pub fn as_script_nb(bytes: &[u8]) -> Result<i64, ScriptError> {
     if bytes.len() > MAX_NUM_SIZE {
-        return Err(ScriptError::ScriptNumberOverflow)
+        return Err(ScriptError::ScriptNumberOverflowErr)
     }
 
     if bytes.is_empty() {
@@ -77,5 +87,13 @@ pub fn as_script_nb(bytes: &[u8]) -> Result<i64, ScriptError> {
 }
 
 pub fn as_bool(bytes: &[u8]) -> bool {
-    return !(bytes.len() == 0 || bytes == [0x80])
+    for i in 0..bytes.len() {
+        if bytes[i] != 0 {
+            if i == bytes.len() - 1 && bytes[i] == 0x80 {
+                return false
+            }
+            return true
+        }
+    }
+    return false
 }
