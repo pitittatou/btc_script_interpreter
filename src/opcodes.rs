@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 pub struct Opcode {
     pub code: u8
 }
-
+// Data Push
 pub const OP_0: Opcode = Opcode {code: 0x00};
 pub const OP_PUSH_BYTES_1: Opcode = Opcode {code: 0x01};
 pub const OP_PUSH_BYTES_2: Opcode = Opcode {code: 0x02};
@@ -106,6 +106,8 @@ pub const OP_13: Opcode = Opcode {code: 0x5d};
 pub const OP_14: Opcode = Opcode {code: 0x5e};
 pub const OP_15: Opcode = Opcode {code: 0x5f};
 pub const OP_16: Opcode = Opcode {code: 0x60};
+
+// Flow Control
 pub const OP_NOP: Opcode = Opcode {code: 0x61};
 pub const OP_VER: Opcode = Opcode {code: 0x62};
 pub const OP_IF: Opcode = Opcode {code: 0x63};
@@ -116,6 +118,8 @@ pub const OP_ELSE: Opcode = Opcode {code: 0x67};
 pub const OP_ENDIF: Opcode = Opcode {code: 0x68};
 pub const OP_VERIFY: Opcode = Opcode {code: 0x69};
 pub const OP_RETURN: Opcode = Opcode {code: 0x6a};
+
+// Stack
 pub const OP_TOALTSTACK: Opcode = Opcode {code: 0x6b};
 pub const OP_FROMALTSTACK: Opcode = Opcode {code: 0x6c};
 pub const OP_2DROP: Opcode = Opcode {code: 0x6d};
@@ -135,19 +139,26 @@ pub const OP_ROLL: Opcode = Opcode {code: 0x7a};
 pub const OP_ROT: Opcode = Opcode {code: 0x7b};
 pub const OP_SWAP: Opcode = Opcode {code: 0x7c};
 pub const OP_TUCK: Opcode = Opcode {code: 0x7d};
+
+// Splice
 pub const OP_CAT: Opcode = Opcode {code: 0x7e};
 pub const OP_SUBSTR: Opcode = Opcode {code: 0x7f};
 pub const OP_LEFT: Opcode = Opcode {code: 0x80};
 pub const OP_RIGHT: Opcode = Opcode {code: 0x81};
 pub const OP_SIZE: Opcode = Opcode {code: 0x82};
+
+// Bitwise Logic
 pub const OP_INVERT: Opcode = Opcode {code: 0x83};
 pub const OP_AND: Opcode = Opcode {code: 0x84};
 pub const OP_OR: Opcode = Opcode {code: 0x85};
 pub const OP_XOR: Opcode = Opcode {code: 0x86};
 pub const OP_EQUAL: Opcode = Opcode {code: 0x87};
 pub const OP_EQUALVERIFY: Opcode = Opcode {code: 0x88};
+
 pub const OP_RESERVED1: Opcode = Opcode {code: 0x89};
 pub const OP_RESERVED2: Opcode = Opcode {code: 0x8a};
+
+// Arithmetic
 pub const OP_1ADD: Opcode = Opcode {code: 0x8b};
 pub const OP_1SUB: Opcode = Opcode {code: 0x8c};
 pub const OP_2MUL: Opcode = Opcode {code: 0x8d};
@@ -175,6 +186,8 @@ pub const OP_GREATERTHANOREQUAL: Opcode = Opcode {code: 0xa2};
 pub const OP_MIN: Opcode = Opcode {code: 0xa3};
 pub const OP_MAX: Opcode = Opcode {code: 0xa4};
 pub const OP_WITHIN: Opcode = Opcode {code: 0xa5};
+
+// Crypto
 pub const OP_RIPEMD160: Opcode = Opcode {code: 0xa6};
 pub const OP_SHA1: Opcode = Opcode {code: 0xa7};
 pub const OP_SHA256: Opcode = Opcode {code: 0xa8};
@@ -185,6 +198,8 @@ pub const OP_CHECKSIG: Opcode = Opcode {code: 0xac};
 pub const OP_CHECKSIGVERIFY: Opcode = Opcode {code: 0xad};
 pub const OP_CHECKMULTISIG: Opcode = Opcode {code: 0xae};
 pub const OP_CHECKMULTISIGVERIFY: Opcode = Opcode {code: 0xaf};
+
+// Expansion
 pub const OP_NOP1: Opcode = Opcode {code: 0xb0};
 pub const OP_CHECKLOCKTIMEVERIFY: Opcode = Opcode {code: 0xb1};
 pub const OP_CHECKSEQUENCEVERIFY: Opcode = Opcode {code: 0xb2};

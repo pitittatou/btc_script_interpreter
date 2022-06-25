@@ -2,16 +2,20 @@ use std::fmt::{Debug, Formatter};
 use crate::opcodes::Opcode as op;
 
 pub const MAX_NUM_SIZE: usize = 4;
+pub const MAX_SCRIPT_SIZE: usize = 10000;
+pub const MAX_STACK_SIZE: usize = 1000;
+pub const MAX_OPS_PER_SCRIPT: usize = 201;
+pub const MAX_SCRIPT_ELEMENT_SIZE: usize = 520;
 pub const SCRIPT_FALSE: [u8; 0] = [];
 pub const SCRIPT_TRUE: [u8; 1] = [0x01];
 
 #[derive(Debug)]
 pub enum ScriptError {
-    ParsingErr,
     InvalidStackOperationErr,
     InvalidAltStackOperationErr,
     ScriptNumberOverflowErr,
     StackOverflowErr,
+    ScriptSizeErr,
     PushSizeErr,
     EqualVerifyErr,
     NumEqualVerifyErr,
@@ -20,7 +24,8 @@ pub enum ScriptError {
     InvalidOpcodeErr,
     BadOpcodeErr,
     VerifyErr,
-    OpReturnErr
+    OpReturnErr,
+    OpCountErr
 }
 
 pub type Script = Vec<ScriptItem>;

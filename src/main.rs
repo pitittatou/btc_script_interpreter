@@ -11,7 +11,7 @@ mod interpret;
 fn main() {
     let hex_script = "76a9149f21a07a0c7c3cf65a51f586051395762267cdaf88ac";
     let bin_script = hex::decode(hex_script).unwrap();
-    let script = parse::parse(&bin_script).unwrap();
+    let script = parse::parse_script(&bin_script).unwrap();
 
     println!("{:?}", &script);
     let bytes = to_script_nb(-0x50ab);
@@ -20,5 +20,5 @@ fn main() {
     println!("{} -> {}", -0x50ab, as_script_nb(&bytes).unwrap());
     println!("{}", as_bool(&[0x80, 0x80]));
     println!("{}", hex::encode(to_script_nb(16)));
-    let _ = interpret::interpret(&script).unwrap();
+    let _ = interpret::interpret(&bin_script).unwrap();
 }

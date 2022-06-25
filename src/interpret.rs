@@ -1,10 +1,11 @@
 use std::cmp::{max, min};
+use bitcoin_hashes::Hash;
+use bitcoin_hashes::{ripemd160, sha1, sha256, hash160, sha256d};
 use crate::{as_bool, as_script_nb};
-use crate::script::{Script, SCRIPT_FALSE, SCRIPT_TRUE, ScriptError, ScriptItem, to_script_nb};
+use crate::script::*;
 use crate::opcodes::*;
+use crate::parse::parse_one_op;
 
-const MAX_STACK_SIZE: usize = 1000;
-const MAX_SCRIPT_ELEMENT_SIZE: usize = 520;
 
 pub struct Stack {
     pub main: Vec<Vec<u8>>,
@@ -78,32 +79,42 @@ impl Stack {
     }
 }
 
-pub fn interpret(script: &Script) -> Result<bool, ScriptError>{
+pub fn interpret(script: &[u8]) -> Result<bool, ScriptError>{
     let mut stack = Stack {main: Vec::with_capacity(20), alt: Vec::with_capacity(20)};
-    let mut conditional_tree: Vec<Option<bool>> = Vec::with_capacity(10);
-    let mut execute = true;
+    let mut condition_stack: Vec<bool> = Vec::with_capacity(10);
+    let mut execute: bool;
+    let mut op_count = 0;
+    let mut pc: usize = 0;
+    let mut item = parse_one_op(script, &mut pc)?;
 
-    for item in script {
-        match item {
+    while item.is_some() {
+        execute = !condition_stack.contains(&false);
+
+        match item.unwrap() {
             ScriptItem::ByteArray(b) => {
                 if b.len() > MAX_SCRIPT_ELEMENT_SIZE {
                     return Err(ScriptError::PushSizeErr)
                 }
                 if execute {
-                    stack.push(b.to_owned())?
+                    stack.push(b)?
                 }
             },
             ScriptItem::Opcode(op) => {
-                if DISABLED_OPCODES.contains(op) {
+                if DISABLED_OPCODES.contains(&op) {
                     return Err(ScriptError::DisabledOpcodeErr)
                 }
-                if *op == OP_VERIF || *op == OP_VERNOTIF {
-                    return Err(ScriptError::InvalidOpcodeErr)
+
+                if op.code > OP_16.code {
+                    op_count += 1;
                 }
+                if op_count > MAX_OPS_PER_SCRIPT {
+                    return Err(ScriptError::OpCountErr)
+                }
+
                 if execute || (OP_IF.code <= op.code && op.code <= OP_ENDIF.code) {
-                    match *op {
+                    match op {
                         //
-                        // Constants
+                        // Data Push
                         //
                         OP_0 => stack.push(to_script_nb(0))?,
                         OP_1NEGATE => stack.push(to_script_nb(-1))?,
@@ -113,40 +124,32 @@ pub fn interpret(script: &Script) -> Result<bool, ScriptError>{
                         // Flow Control
                         //
                         OP_NOP => {}
+                        OP_CHECKSEQUENCEVERIFY => {}
+                        OP_CHECKLOCKTIMEVERIFY => {}
+                        OP_NOP1 | OP_NOP4 | OP_NOP5 | OP_NOP6 |
+                        OP_NOP7 | OP_NOP8 | OP_NOP9 | OP_NOP10 => {}
                         OP_IF | OP_NOTIF => {
-                            conditional_tree.push(None);
+                            let mut condition = false;
                             if execute {
-                                let mut condition = as_bool(&stack.pop()?);
-                                if *op == OP_NOTIF {
+                                condition = as_bool(&stack.pop()?);
+                                if op == OP_NOTIF {
                                     condition = !condition;
                                 }
-                                *conditional_tree.last_mut().unwrap() = Some(condition);
-                                execute = condition;
                             }
+                            condition_stack.push(condition);
                         }
                         OP_ELSE => {
-                            if conditional_tree.is_empty() {
+                            if condition_stack.is_empty() {
                                 return Err(ScriptError::UnbalancedConditionalErr)
                             }
-                            let last = conditional_tree.last_mut().unwrap();
-                            match *last {
-                                Some(state) => {
-                                    *last = Some(!state);
-                                    execute = !state;
-                                },
-                                None => {}
-                            }
+                            let last = condition_stack.last_mut().unwrap();
+                            *last = !*last;
                         }
                         OP_ENDIF => {
-                            if conditional_tree.is_empty() {
+                            if condition_stack.is_empty() {
                                 return Err(ScriptError::UnbalancedConditionalErr)
                             }
-                            conditional_tree.pop();
-                            if conditional_tree.is_empty() {
-                                execute = true
-                            } else {
-                                execute = conditional_tree.last().unwrap().unwrap()
-                            }
+                            condition_stack.pop();
                         }
                         OP_VERIFY => {
                             let v = as_bool(&stack.pop()?);
@@ -265,7 +268,7 @@ pub fn interpret(script: &Script) -> Result<bool, ScriptError>{
                                 stack.push(Vec::from(SCRIPT_FALSE))?
                             }
 
-                            if *op == OP_EQUALVERIFY {
+                            if op == OP_EQUALVERIFY {
                                 if v1 == v2 {
                                     stack.pop()?;
                                 } else {
@@ -279,7 +282,7 @@ pub fn interpret(script: &Script) -> Result<bool, ScriptError>{
                         //
                         OP_1ADD | OP_1SUB | OP_NEGATE | OP_ABS | OP_NOT | OP_0NOTEQUAL => {
                             let mut v = as_script_nb(&stack.pop()?)?;
-                            match *op {
+                            match op {
                                 OP_1ADD => v += 1,
                                 OP_1SUB => v -= 1,
                                 OP_NEGATE => v *= -1,
@@ -295,7 +298,7 @@ pub fn interpret(script: &Script) -> Result<bool, ScriptError>{
                         OP_GREATERTHANOREQUAL | OP_MIN | OP_MAX => {
                             let v2 = as_script_nb(&stack.pop()?)?;
                             let v1 = as_script_nb(&stack.pop()?)?;
-                            let res = match *op {
+                            let res = match op {
                                 OP_ADD => v1 + v2,
                                 OP_SUB => v1 - v2,
                                 OP_BOOLAND => (v1 != 0 && v2 != 0) as i64,
@@ -312,7 +315,7 @@ pub fn interpret(script: &Script) -> Result<bool, ScriptError>{
                             };
                             stack.push(to_script_nb(res))?;
 
-                            if *op == OP_NUMEQUALVERIFY {
+                            if op == OP_NUMEQUALVERIFY {
                                 if v1 == v2 {
                                     stack.pop()?;
                                 } else {
@@ -331,15 +334,43 @@ pub fn interpret(script: &Script) -> Result<bool, ScriptError>{
                         //
                         // Crypto
                         //
+                        OP_RIPEMD160 => {
+                            let v = stack.pop()?;
+                            let res = ripemd160::Hash::hash(&v).to_vec();
+                            stack.push(res)?
+                        }
+                        OP_SHA1 => {
+                            let v = stack.pop()?;
+                            let res = sha1::Hash::hash(&v).to_vec();
+                            stack.push(res)?
+                        }
+                        OP_SHA256 => {
+                            let v = stack.pop()?;
+                            let res = sha256::Hash::hash(&v).to_vec();
+                            stack.push(res)?
+                        }
+                        OP_HASH160 => {
+                            let v = stack.pop()?;
+                            let res = hash160::Hash::hash(&v).to_vec();
+                            stack.push(res)?
+                        }
+                        OP_HASH256 => {
+                            let v = stack.pop()?;
+                            let res = sha256d::Hash::hash(&v).to_vec();
+                            stack.push(res)?
+                        }
+
 
                         _ => return Err(ScriptError::BadOpcodeErr)
                     }
                 }
             }
         }
-        if !conditional_tree.is_empty() {
-            return Err(ScriptError::UnbalancedConditionalErr)
-        }
+        item = parse_one_op(script, &mut pc)?;
+    }
+
+    if !condition_stack.is_empty() {
+        return Err(ScriptError::UnbalancedConditionalErr)
     }
 
     Ok(true)
