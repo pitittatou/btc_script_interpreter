@@ -117,8 +117,7 @@ fn print_state(stack: &Stack, script: &Script, step_nb: usize) {
     let mut display_max_width = MAX_SCRIPT_DISPLAY_WIDTH;
     let display_min_width = MIN_SCRIPT_DISPLAY_WIDTH;
 
-    if let Some((mut w, _)) = term_size::dimensions() {
-        w -= 1;
+    if let Some((w, _)) = term_size::dimensions() {
         if w > MIN_SCRIPT_DISPLAY_WIDTH && w < MAX_SCRIPT_DISPLAY_WIDTH {
             display_max_width = w;
         }
@@ -132,14 +131,14 @@ fn print_state(stack: &Stack, script: &Script, step_nb: usize) {
 
         let colors = ["green", "yellow", "magenta", "cyan", "white"];
         let mut line_len = 0;
-        for item in script {
-            let mut item_str = format!("{:?}", item);
+        for i in 0..script.len() {
+            let mut item_str = format!("{:?}", script[i]);
             if line_len + item_str.len() > display_max_width && line_len > 0 {
                 println!("\n");
                 line_len = 0;
             }
 
-            let color = String::from("bright ") + match item {
+            let color = String::from("bright ") + match script[i] {
                 ScriptItem::ByteArray(..) => "blue",
                 ScriptItem::Opcode(op) => {
                     colors[(op.code % colors.len() as u8) as usize]
@@ -155,8 +154,13 @@ fn print_state(stack: &Stack, script: &Script, step_nb: usize) {
                 println!("{}\n", item_str.bold().black().on_color(color));
                 line_len = 0;
             } else {
-                print!("{} ", item_str.bold().black().on_color(color));
-                line_len += item_str.len() + 1;
+                print!("{}", item_str.bold().black().on_color(color));
+                line_len += item_str.len();
+
+                if i != script.len() - 1 {
+                    print!(" ");
+                    line_len += 1;
+                }
             }
         }
         println!();
