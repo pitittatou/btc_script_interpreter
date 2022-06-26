@@ -6,8 +6,6 @@ pub const MAX_SCRIPT_SIZE: usize = 10000;
 pub const MAX_STACK_SIZE: usize = 1000;
 pub const MAX_OPS_PER_SCRIPT: usize = 201;
 pub const MAX_SCRIPT_ELEMENT_SIZE: usize = 520;
-pub const SCRIPT_FALSE: [u8; 0] = [];
-pub const SCRIPT_TRUE: [u8; 1] = [0x01];
 
 #[derive(Debug)]
 pub enum ScriptError {
@@ -21,7 +19,6 @@ pub enum ScriptError {
     NumEqualVerifyErr,
     UnbalancedConditionalErr,
     DisabledOpcodeErr,
-    InvalidOpcodeErr,
     BadOpcodeErr,
     VerifyErr,
     OpReturnErr,
@@ -40,7 +37,7 @@ impl Debug for ScriptItem {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             ScriptItem::Opcode(op) => write!(f, "{}", op),
-            ScriptItem::ByteArray(b) => write!(f, "{}", hex::encode(b))
+            ScriptItem::ByteArray(b) => write!(f, "0x{}", hex::encode(b))
         }
     }
 }

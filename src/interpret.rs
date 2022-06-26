@@ -1,11 +1,16 @@
 use std::cmp::{max, min};
-use bitcoin_hashes::Hash;
-use bitcoin_hashes::{ripemd160, sha1, sha256, hash160, sha256d};
-use crate::{as_bool, as_script_nb};
-use crate::script::*;
-use crate::opcodes::*;
-use crate::parse::parse_one_op;
 
+use bitcoin_hashes::{hash160, ripemd160, sha1, sha256, sha256d};
+use bitcoin_hashes::Hash;
+use colored::Colorize;
+use tabled::{Alignment, MaxWidth, MinWidth, Modify, Style};
+use tabled::builder::Builder;
+use tabled::object::Rows;
+
+use crate::{as_bool, as_script_nb, MAX_SCRIPT_DISPLAY_WIDTH, MIN_SCRIPT_DISPLAY_WIDTH};
+use crate::opcodes::*;
+use crate::parse::{parse_one_op, parse_script};
+use crate::script::*;
 
 pub struct Stack {
     pub main: Vec<Vec<u8>>,
@@ -14,24 +19,26 @@ pub struct Stack {
 
 impl Stack {
     fn push(&mut self, bytes: Vec<u8>) -> Result<(), ScriptError> {
-        if self.main.len() + self.alt.len() >= MAX_STACK_SIZE {
-            return Err(ScriptError::StackOverflowErr)
-        }
         if bytes.len() > MAX_SCRIPT_ELEMENT_SIZE {
             return Err(ScriptError::PushSizeErr)
         }
         self.main.push(bytes);
+
+        if self.main.len() + self.alt.len() >= MAX_STACK_SIZE {
+            return Err(ScriptError::StackOverflowErr)
+        }
         Ok(())
     }
 
     fn push_alt(&mut self, bytes: Vec<u8>) -> Result<(), ScriptError> {
-        if self.main.len() + self.alt.len() >= MAX_STACK_SIZE {
-            return Err(ScriptError::StackOverflowErr)
-        }
         if bytes.len() > MAX_SCRIPT_ELEMENT_SIZE {
             return Err(ScriptError::PushSizeErr)
         }
         self.alt.push(bytes);
+
+        if self.main.len() + self.alt.len() >= MAX_STACK_SIZE {
+            return Err(ScriptError::StackOverflowErr)
+        }
         Ok(())
     }
 
@@ -79,14 +86,114 @@ impl Stack {
     }
 }
 
-pub fn interpret(script: &[u8]) -> Result<bool, ScriptError>{
+fn print_stack(stack: &Vec<Vec<u8>>, title: &str, min_width: usize, max_width: usize) {
+    let mut hex_stack = {
+        let mut vec = Vec::new();
+        for elem in stack {
+            vec.push(format!("0x{}", hex::encode(elem)))
+        }
+        if stack.is_empty() {
+            vec.push(String::from(""));
+        }
+        vec
+    };
+    hex_stack.reverse();
+
+    let mut table_builder = Builder::default().set_columns([title]);
+    for item in &hex_stack {
+        table_builder = table_builder.add_record([item]);
+    }
+
+    let table = table_builder.build().with(Style::modern())
+        .with(MaxWidth::wrapping(max_width))
+        .with(MinWidth::new(min_width))
+        .with(Modify::new(Rows::new(1..))
+            .with(Alignment::left()));
+
+    print!("{}", &table.to_string());
+}
+
+fn print_state(stack: &Stack, script: &Script, step_nb: usize) {
+    let mut display_max_width = MAX_SCRIPT_DISPLAY_WIDTH;
+    let display_min_width = MIN_SCRIPT_DISPLAY_WIDTH;
+
+    if let Some((mut w, _)) = term_size::dimensions() {
+        w -= 1;
+        if w > MIN_SCRIPT_DISPLAY_WIDTH && w < MAX_SCRIPT_DISPLAY_WIDTH {
+            display_max_width = w;
+        }
+    }
+
+    println!("\n\n");
+
+    // Print remaining script instructions
+    if !script.is_empty() {
+        println!("{} (Step {})\n", "Script".bold(), step_nb);
+
+        let colors = ["green", "yellow", "magenta", "cyan", "white"];
+        let mut line_len = 0;
+        for item in script {
+            let mut item_str = format!("{:?}", item);
+            if line_len + item_str.len() > display_max_width && line_len > 0 {
+                println!("\n");
+                line_len = 0;
+            }
+
+            let color = String::from("bright ") + match item {
+                ScriptItem::ByteArray(..) => "blue",
+                ScriptItem::Opcode(op) => {
+                    colors[(op.code % colors.len() as u8) as usize]
+                }
+            };
+
+            if item_str.len() > display_max_width {
+                while item_str.len() > display_max_width {
+                    let sub_str = &item_str[..display_max_width];
+                    println!("{}", sub_str.bold().black().on_color(color.as_str()));
+                    item_str = String::from(&item_str[display_max_width..])
+                }
+                println!("{}\n", item_str.bold().black().on_color(color));
+                line_len = 0;
+            } else {
+                print!("{} ", item_str.bold().black().on_color(color));
+                line_len += item_str.len() + 1;
+            }
+        }
+        println!();
+    } else {
+        println!("{}", "Final state".bold());
+    }
+
+    print_stack(&stack.main, "Main Stack", display_min_width, display_max_width);
+
+    if !&stack.alt.is_empty() {
+        print_stack(&stack.alt, "Alt Stack", display_min_width, display_max_width);
+    }
+}
+
+pub fn interpret(script: &[u8], verbose: bool) -> Result<(), ScriptError> {
+    const SCRIPT_FALSE: [u8; 0] = [];
+    const SCRIPT_TRUE: [u8; 1] = [0x01];
+
     let mut stack = Stack {main: Vec::with_capacity(20), alt: Vec::with_capacity(20)};
     let mut condition_stack: Vec<bool> = Vec::with_capacity(10);
     let mut execute: bool;
-    let mut op_count = 0;
+    let mut op_count: usize = 0;
     let mut pc: usize = 0;
-    let mut item = parse_one_op(script, &mut pc)?;
+    let mut code_hash_start: usize = 0;
 
+    if script.len() > MAX_SCRIPT_SIZE {
+        return Err(ScriptError::ScriptSizeErr)
+    }
+
+    let mut display_script: Script = Script::new();
+    let mut step_nb: usize = 0;
+    if verbose {
+        display_script = parse_script(&script)?;
+        print_state(&stack, &display_script, step_nb);
+    }
+
+    let mut item = parse_one_op(script, &mut pc)?;
     while item.is_some() {
         execute = !condition_stack.contains(&false);
 
@@ -289,7 +396,7 @@ pub fn interpret(script: &[u8]) -> Result<bool, ScriptError>{
                                 OP_ABS => v = v.abs(),
                                 OP_NOT => v = (v == 0) as i64,
                                 OP_0NOTEQUAL => v = (v != 0) as i64,
-                                _ => {}
+                                _ => panic!()
                             }
                             stack.push(to_script_nb(v))?
                         }
@@ -311,7 +418,7 @@ pub fn interpret(script: &[u8]) -> Result<bool, ScriptError>{
                                 OP_GREATERTHANOREQUAL => (v1 >= v2) as i64,
                                 OP_MIN => min(v1, v2),
                                 OP_MAX => max(v1, v2),
-                                _ => 0
+                                _ => panic!()
                             };
                             stack.push(to_script_nb(res))?;
 
@@ -334,30 +441,24 @@ pub fn interpret(script: &[u8]) -> Result<bool, ScriptError>{
                         //
                         // Crypto
                         //
-                        OP_RIPEMD160 => {
+                        OP_RIPEMD160 | OP_SHA1 | OP_SHA256 | OP_HASH160 | OP_HASH256 => {
                             let v = stack.pop()?;
-                            let res = ripemd160::Hash::hash(&v).to_vec();
+                            let res = match op {
+                                OP_RIPEMD160 => ripemd160::Hash::hash(&v).to_vec(),
+                                OP_SHA1 => sha1::Hash::hash(&v).to_vec(),
+                                OP_SHA256 => sha256::Hash::hash(&v).to_vec(),
+                                OP_HASH160 => hash160::Hash::hash(&v).to_vec(),
+                                OP_HASH256 => sha256d::Hash::hash(&v).to_vec(),
+                                _ => panic!()
+                            };
                             stack.push(res)?
                         }
-                        OP_SHA1 => {
-                            let v = stack.pop()?;
-                            let res = sha1::Hash::hash(&v).to_vec();
-                            stack.push(res)?
+                        OP_CODESEPARATOR => code_hash_start = pc,
+                        OP_CHECKSIG | OP_CHECKSIGVERIFY => {
+
                         }
-                        OP_SHA256 => {
-                            let v = stack.pop()?;
-                            let res = sha256::Hash::hash(&v).to_vec();
-                            stack.push(res)?
-                        }
-                        OP_HASH160 => {
-                            let v = stack.pop()?;
-                            let res = hash160::Hash::hash(&v).to_vec();
-                            stack.push(res)?
-                        }
-                        OP_HASH256 => {
-                            let v = stack.pop()?;
-                            let res = sha256d::Hash::hash(&v).to_vec();
-                            stack.push(res)?
+                        OP_CHECKMULTISIG | OP_CHECKMULTISIGVERIFY => {
+
                         }
 
 
@@ -367,11 +468,17 @@ pub fn interpret(script: &[u8]) -> Result<bool, ScriptError>{
             }
         }
         item = parse_one_op(script, &mut pc)?;
+
+        if verbose {
+            display_script.remove(0);
+            step_nb += 1;
+            print_state(&stack, &display_script, step_nb);
+        }
     }
 
     if !condition_stack.is_empty() {
         return Err(ScriptError::UnbalancedConditionalErr)
     }
 
-    Ok(true)
+    Ok(())
 }

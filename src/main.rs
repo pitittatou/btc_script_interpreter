@@ -1,6 +1,6 @@
 extern crate core;
 
-use crate::script::{as_bool, as_script_nb, to_script_nb};
+use crate::script::{as_bool, as_script_nb};
 
 mod opcodes;
 mod parse;
@@ -8,17 +8,19 @@ mod script;
 mod interpret;
 
 
+// Constants to configure step-by-step script execution display
+pub const MAX_SCRIPT_DISPLAY_WIDTH:usize = 80;
+pub const MIN_SCRIPT_DISPLAY_WIDTH:usize = 30;
+
+
 fn main() {
-    let hex_script = "76a9149f21a07a0c7c3cf65a51f586051395762267cdaf88ac";
+    let sig_script = "483045022100fcb600ea44edb6b3c9408479c9e29d468bf623e5b465be4d594141b0d7611d2a022069d470033446f0b6c8c85ced09b3e3c2b675e21a0f3017a5fac2ad064a4d1d1e012103dd2162aaf74d3f2e0634ad778380eeecea6ac5f2e53411a128a323ad260d0dc7";
+    let pk_script = "76a9148b6305816c87626a9ac4b972c5c376663b2f5dc888ac";
+    let hex_script = sig_script.to_owned() + pk_script;
+    //let hex_script = "515560606b6c05abcdefabcd";
     let bin_script = hex::decode(hex_script).unwrap();
     let script = parse::parse_script(&bin_script).unwrap();
 
     println!("{:?}", &script);
-    let bytes = to_script_nb(-0x50ab);
-    println!("{}", hex::encode(&bytes));
-    println!("{}", bytes.len());
-    println!("{} -> {}", -0x50ab, as_script_nb(&bytes).unwrap());
-    println!("{}", as_bool(&[0x80, 0x80]));
-    println!("{}", hex::encode(to_script_nb(16)));
-    let _ = interpret::interpret(&bin_script).unwrap();
+    let _ = interpret::interpret(&bin_script, true).unwrap();
 }

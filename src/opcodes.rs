@@ -210,6 +210,8 @@ pub const OP_NOP7: Opcode = Opcode {code: 0xb6};
 pub const OP_NOP8: Opcode = Opcode {code: 0xb7};
 pub const OP_NOP9: Opcode = Opcode {code: 0xb8};
 pub const OP_NOP10: Opcode = Opcode {code: 0xb9};
+
+// Unassigned
 pub const OP_UNASSIGNED_186: Opcode = Opcode {code: 0xba};
 pub const OP_UNASSIGNED_187: Opcode = Opcode {code: 0xbb};
 pub const OP_UNASSIGNED_188: Opcode = Opcode {code: 0xbc};
